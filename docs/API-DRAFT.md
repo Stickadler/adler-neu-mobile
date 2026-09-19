@@ -2,13 +2,26 @@
 
 Basis: /api/v1
 
-- GET /me
-- GET /employees?active=true
+- GET /me – aktuell angemeldeter Benutzer und stabile Benutzer-ID
+- GET /employees?active=true – aktive Mitarbeiter
+- POST /attachments – multipart/form-data, liefert { id }
 - POST /todos
 - POST /pinboard/notes
-- POST /attachments
-- POST /speech/interpret
+- POST /speech/interpret – optional für spätere serverseitige Interpretation
 
-Todo-Felder: title, description, due_at, assigned_user_ids, attachment_ids.
+## Eintrag
+```json
+{
+  "title": "Rechnung Müller prüfen",
+  "description": "Belege kontrollieren",
+  "due_at": "2026-09-22T14:00:00",
+  "assigned_user_ids": ["employee-id"],
+  "attachment_ids": ["attachment-id"]
+}
+```
 
-Authentifizierung und konkrete Serverimplementierung werden unabhängig vom Hosting-Anbieter gehalten.
+Die Mobile-App speichert Mitarbeiter niemals nur anhand des Anzeigenamens. Namen werden gegen GET /employees aufgelöst; gespeichert wird die stabile ID. Mehrdeutige Namen müssen vor dem Speichern aufgelöst werden.
+
+Anhänge werden zuerst hochgeladen. Die gelieferten Attachment-IDs werden anschließend am Todo bzw. Pinnwand-Eintrag gespeichert. Große Binärdaten gehören nicht direkt in die Todo-Tabelle.
+
+Authentifizierung und Serverimplementierung bleiben unabhängig vom Hosting-Anbieter.

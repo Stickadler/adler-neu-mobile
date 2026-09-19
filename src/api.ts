@@ -1,4 +1,4 @@
-import type{Employee,EntryKind}from'./types';
+import type{Employee,EntryKind,EntryPayload}from'./types';
 const base=(import.meta.env.VITE_ADLER_API_URL||'').replace(/\/$/,'');
-async function request<T>(path:string,init?:RequestInit):Promise<T>{if(!base)throw new Error('API noch nicht konfiguriert');const r=await fetch(base+path,{...init,headers:{'Content-Type':'application/json',...(init?.headers||{})},credentials:'include'});if(!r.ok)throw new Error('API '+r.status);return r.json()}
-export const adlerApi={employees:()=>request<Employee[]>('/api/v1/employees?active=true'),createEntry:(kind:EntryKind,data:unknown)=>request(kind==='todo'?'/api/v1/todos':'/api/v1/pinboard/notes',{method:'POST',body:JSON.stringify(data)})};
+async function request<T>(path:string,init?:RequestInit):Promise<T>{if(!base)throw new Error('API noch nicht konfiguriert');const r=await fetch(base+path,{...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(init?.headers||{})},credentials:'include'});if(!r.ok)throw new Error('API '+r.status);if(r.status===204)return undefined as T;return r.json()}
+export const adlerApi={employees:()=>request<Employee[]>('/api/v1/employees?active=true'),uploadAttachment:(file:File)=>{const data=new FormData();data.append('file',file);return request<{id:string}>('/api/v1/attachments',{method:'POST',body:data})},createEntry:(kind:EntryKind,data:EntryPayload)=>request<{id:string}>(kind==='todo'?'/api/v1/todos':'/api/v1/pinboard/notes',{method:'POST',body:JSON.stringify(data)})};

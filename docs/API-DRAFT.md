@@ -1,27 +1,19 @@
-# API Entwurf v0
+# Tatsächlicher Adler-Neu-API-Vertrag
 
-Basis: /api/v1
+Stand: `Stickadler/produktionsprogramm-v1`, Branch `main`, geprüft am 20.09.2026.
 
-- GET /me – aktuell angemeldeter Benutzer und stabile Benutzer-ID
-- GET /employees?active=true – aktive Mitarbeiter
-- POST /attachments – multipart/form-data, liefert { id }
-- POST /todos
-- POST /pinboard/notes
-- POST /speech/interpret – optional für spätere serverseitige Interpretation
+- `GET /api/auth/me` – angemeldeter Benutzer; liefert Name und E-Mail, derzeit aber keine stabile Benutzer-ID.
+- `GET /api/form-config` – enthält unter anderem `config.employees` mit stabiler Mitarbeiter-ID, Name, Aktivstatus und optionaler Benutzerverknüpfung.
+- `POST /api/todos` – legt ein Todo mit `title`, `description`, `columnId`, `dueDate` und `assignedEmployeeId` an.
+- `POST /api/notes` – legt eine Notiz mit `title`, `description`, `category` und `data` an.
+- `POST /api/todos/:id/images` und `POST /api/notes/:id/images` – mehrteiliger Bild-Upload nach dem Anlegen des Eintrags.
 
-## Eintrag
-```json
-{
-  "title": "Rechnung Müller prüfen",
-  "description": "Belege kontrollieren",
-  "due_at": "2026-09-22T14:00:00",
-  "assigned_user_ids": ["employee-id"],
-  "attachment_ids": ["attachment-id"]
-}
-```
+Der Mobile-Client verwendet diese bestehenden Verträge. Es gibt keine generischen Endpunkte `/api/v1/employees`, `/api/v1/attachments` oder `/api/v1/pinboard/notes`.
 
-Die Mobile-App speichert Mitarbeiter niemals nur anhand des Anzeigenamens. Namen werden gegen GET /employees aufgelöst; gespeichert wird die stabile ID. Mehrdeutige Namen müssen vor dem Speichern aufgelöst werden.
+## Bilder
 
-Anhänge werden zuerst hochgeladen. Die gelieferten Attachment-IDs werden anschließend am Todo bzw. Pinnwand-Eintrag gespeichert. Große Binärdaten gehören nicht direkt in die Todo-Tabelle.
+Ein Todo beziehungsweise eine Notiz wird zuerst angelegt. Danach werden Bilder in Blöcken bis 800 KiB übertragen und mit einer Abschlussanfrage zusammengesetzt. Die Datenbank speichert nur Metadaten und den R2-Objektschlüssel; die Bilddaten liegen im Bucket.
 
-Authentifizierung und Serverimplementierung bleiben unabhängig vom Hosting-Anbieter.
+## Noch offene Integrationsgrenze
+
+Die produktive Anmeldung nutzt ein HttpOnly-Cookie mit `SameSite=Lax`. Eine separat auf GitHub Pages gehostete PWA kann dieses Cookie bei Cross-Origin-API-Aufrufen nicht zuverlässig verwenden. Vor produktiver Anbindung ist deshalb eine freigegebene, hostingunabhängige Authentifizierungs- und CORS-Lösung oder eine Bereitstellung unter derselben Site erforderlich.

@@ -1,9 +1,9 @@
 import React,{useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
-import{Mic,CheckSquare,StickyNote,Camera,UserRound,CalendarDays,Clock3,X}from'lucide-react';
+import{Mic,CheckSquare,StickyNote,Camera,UserRound,CalendarDays,Clock3,X,Volume2,VolumeX}from'lucide-react';
 import'./styles.css';
 import{parseVoice}from'./voiceParser';
-import{listenOnce,speak}from'./speech';
+import{listenOnce,speak,stopSpeaking}from'./speech';
 import{adlerApi}from'./api';
 import{resolveAssignee}from'./assigneeResolver';
 import type{VoiceDraft,EntryKind,Employee,EntryPayload}from'./types';
@@ -25,9 +25,11 @@ function App(){
   const[selectedEmployeeId,setSelectedEmployeeId]=useState('');
   const[saving,setSaving]=useState(false);
   const[listening,setListening]=useState(false);
+  const[voicePrompts,setVoicePrompts]=useState(()=>localStorage.getItem('adler-voice-prompts')!=='off');
   const[guide,setGuide]=useState<GuideStep>('idle');
   const camera=useRef<HTMLInputElement>(null);
   const activeInput=useRef<AbortController|null>(null);
+  const voicePromptsRef=useRef(voicePrompts);
 
   useEffect(()=>{adlerApi.employees().then(setEmployees).catch(()=>setStatus('Entwurfsmodus – Adler API noch nicht erreichbar.'))},[]);
   useEffect(()=>{
@@ -50,19 +52,27 @@ function App(){
   const hear=async(controller:AbortController)=>{
     setListening(true);
     setStatus('Ich höre zu … Sprich in Ruhe.');
-    try{return(await listenOnce({timeoutMs:30000,silenceMs:5000,signal:controller.signal})).text}
+    try{return(await listenOnce({timeoutMs:30000,silenceMs:5000,signal:controller.signal,onTranscript:text=>setStatus(`Erkannt: „${text}“ – ich warte 5 Sekunden.`)})).text}
     finally{if(activeInput.current===controller)setListening(false)}
   };
   const ask=async(text:string,controller:AbortController)=>{
     setStatus(text);
-    await speak(text,controller.signal);
+    if(voicePromptsRef.current)await speak(text,controller.signal);
+    else await new Promise(resolve=>window.setTimeout(resolve,200));
     return hear(controller)
+  };
+  const toggleVoicePrompts=()=>{
+    const enabled=!voicePromptsRef.current;
+    voicePromptsRef.current=enabled;
+    setVoicePrompts(enabled);
+    localStorage.setItem('adler-voice-prompts',enabled?'on':'off');
+    if(!enabled)stopSpeaking();
   };
   const cancelInput=()=>{
     const controller=activeInput.current;
     activeInput.current=null;
     controller?.abort();
-    window.speechSynthesis?.cancel();
+    stopSpeaking();
     setListening(false);
     setGuide('idle');
     setStatus('Eingabe abgebrochen.');
@@ -133,7 +143,7 @@ function App(){
       }
       setGuide('idle');
       setStatus('Aufgabe vollständig. Bitte prüfen, optional Bilder hinzufügen und speichern.');
-      void speak('Aufgabe vollständig. Bitte prüfen und speichern.');
+      if(voicePromptsRef.current)void speak('Aufgabe vollständig. Bitte prüfen und speichern.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setGuide('idle');
@@ -162,7 +172,7 @@ function App(){
   return <>
     <header className="app-header">
       <div className="brand"><img src={import.meta.env.BASE_URL+'adler-logo.png'} alt="Adler Neu"/><div><strong>Adler Neu</strong><span>Mobile App</span></div></div>
-      <Mic aria-hidden="true"/>
+      <button className="voice-toggle" onClick={toggleVoicePrompts} aria-label={voicePrompts?'Sprachausgabe stummschalten':'Sprachausgabe einschalten'} title={voicePrompts?'Sprachausgabe an':'Sprachausgabe aus'}>{voicePrompts?<Volume2/>:<VolumeX/>}<span>{voicePrompts?'Ton an':'Stumm'}</span></button>
     </header>
     <main>
       <section className="hero">

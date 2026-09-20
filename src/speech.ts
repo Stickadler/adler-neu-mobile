@@ -1,11 +1,13 @@
 export type SpeechResult={text:string};
-export type ListenOptions={timeoutMs?:number;silenceMs?:number;signal?:AbortSignal};
+export type ListenOptions={timeoutMs?:number;silenceMs?:number;signal?:AbortSignal;onTranscript?:(text:string)=>void};
+
+let activeSpeechStop:(()=>void)|null=null;
 
 function abortError(){return new DOMException('Eingabe abgebrochen.','AbortError')}
 
 export function speechSupported(){return Boolean((window as any).SpeechRecognition||(window as any).webkitSpeechRecognition)}
 
-export function listenOnce({timeoutMs=30000,silenceMs=5000,signal}:ListenOptions={}):Promise<SpeechResult>{
+export function listenOnce({timeoutMs=30000,silenceMs=5000,signal,onTranscript}:ListenOptions={}):Promise<SpeechResult>{
   return new Promise((resolve,reject)=>{
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SR){reject(new Error('Spracherkennung wird von diesem Browser nicht unterstützt.'));return}
@@ -15,6 +17,7 @@ export function listenOnce({timeoutMs=30000,silenceMs=5000,signal}:ListenOptions
     let settled=false;
     let completedTranscript='';
     let currentTranscript='';
+    let lastReportedTranscript='';
     let silenceTimer:number|undefined;
     let restartTimer:number|undefined;
     const clean=()=>{clearTimeout(overallTimer);clearTimeout(silenceTimer);clearTimeout(restartTimer);signal?.removeEventListener('abort',onAbort)};
@@ -25,11 +28,15 @@ export function listenOnce({timeoutMs=30000,silenceMs=5000,signal}:ListenOptions
     const onAbort=()=>finish(()=>reject(abortError()));
     const overallTimer=window.setTimeout(complete,timeoutMs);
 
-    recognition.lang='de-DE';recognition.continuous=true;recognition.interimResults=true;recognition.maxAlternatives=1;
+    recognition.lang='de-DE';recognition.continuous=false;recognition.interimResults=true;recognition.maxAlternatives=1;
     recognition.onresult=(event:any)=>{
       currentTranscript=Array.from(event.results||[]).map((result:any)=>String(result?.[0]?.transcript||'')).join(' ').replace(/\s+/g,' ').trim();
+      const heard=fullTranscript();
+      if(!heard||heard===lastReportedTranscript)return;
+      lastReportedTranscript=heard;
+      onTranscript?.(heard);
       clearTimeout(silenceTimer);
-      if(fullTranscript())silenceTimer=window.setTimeout(complete,silenceMs);
+      silenceTimer=window.setTimeout(complete,silenceMs);
     };
     recognition.onend=()=>{
       if(settled)return;
@@ -51,13 +58,23 @@ export function speak(text:string,signal?:AbortSignal):Promise<void>{
   if(!('speechSynthesis'in window))return Promise.resolve();
   if(signal?.aborted)return Promise.reject(abortError());
   return new Promise((resolve,reject)=>{
-    window.speechSynthesis.cancel();
+    stopSpeaking();
     const utterance=new SpeechSynthesisUtterance(text);let finished=false;
-    const clean=()=>signal?.removeEventListener('abort',onAbort);
+    let watchdog:number|undefined;
+    const clean=()=>{clearTimeout(watchdog);signal?.removeEventListener('abort',onAbort);if(activeSpeechStop===finish)activeSpeechStop=null};
     const finish=()=>{if(finished)return;finished=true;clean();resolve()};
     const onAbort=()=>{if(finished)return;finished=true;clean();window.speechSynthesis.cancel();reject(abortError())};
+    watchdog=window.setTimeout(finish,Math.min(12000,Math.max(4000,text.length*90)));
     utterance.lang='de-DE';utterance.onend=finish;utterance.onerror=finish;
+    activeSpeechStop=finish;
     signal?.addEventListener('abort',onAbort,{once:true});
     window.speechSynthesis.speak(utterance)
   })
+}
+
+export function stopSpeaking(){
+  const finish=activeSpeechStop;
+  activeSpeechStop=null;
+  if('speechSynthesis'in window)window.speechSynthesis.cancel();
+  finish?.()
 }

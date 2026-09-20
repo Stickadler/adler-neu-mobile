@@ -32,6 +32,17 @@ describe('listenOnce',()=>{
     await expect(promise).resolves.toEqual({text:'Material für Müller bestellen'});
   });
 
+  it('verlängert die Wartezeit nicht bei identischen Zwischenergebnissen',async()=>{
+    const promise=listenOnce();
+    const recognition=FakeRecognition.instances[0];
+    const result={results:[{0:{transcript:'Rechnung prüfen'}}]};
+    recognition.onresult(result);
+    await vi.advanceTimersByTimeAsync(4000);
+    recognition.onresult(result);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(promise).resolves.toEqual({text:'Rechnung prüfen'});
+  });
+
   it('übernimmt mehrere Sprachabschnitte nach automatischem Erkennungsende',async()=>{
     const promise=listenOnce();
     const recognition=FakeRecognition.instances[0];

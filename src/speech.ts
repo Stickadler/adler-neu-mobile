@@ -1,0 +1,4 @@
+export type SpeechResult={text:string};
+export function speechSupported(){return Boolean((window as any).SpeechRecognition||(window as any).webkitSpeechRecognition)}
+export function listenOnce():Promise<SpeechResult>{return new Promise((resolve,reject)=>{const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(!SR)return reject(new Error('Spracherkennung wird von diesem Browser nicht unterstützt.'));const r=new SR();r.lang='de-DE';r.interimResults=false;r.maxAlternatives=1;r.onerror=()=>reject(new Error('Spracheingabe fehlgeschlagen.'));r.onresult=(e:any)=>resolve({text:e.results[0][0].transcript});r.start()})}
+export function speak(text:string){if(!('speechSynthesis'in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='de-DE';window.speechSynthesis.speak(u)}

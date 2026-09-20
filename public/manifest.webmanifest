@@ -1,1 +1,25 @@
-{"name":"Adler Neu Mobile","short_name":"Adler","start_url":".","scope":".","display":"standalone","background_color":"#f5f6f8","theme_color":"#111827","lang":"de","description":"Mobile Oberfläche für Adler Neu"}
+{
+  "name": "Adler Neu Mobile",
+  "short_name": "Adler",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#111827",
+  "lang": "de",
+  "description": "Mobile Oberfläche für Adler Neu",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -21,15 +21,27 @@ describe('listenOnce',()=>{
   });
   afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals()});
 
-  it('wartet nach der letzten Sprache 2,5 Sekunden',async()=>{
+  it('wartet nach der letzten Sprache fünf Sekunden',async()=>{
     let settled=false;
     const promise=listenOnce().then(result=>{settled=true;return result});
     const recognition=FakeRecognition.instances[0];
     recognition.onresult({results:[{0:{transcript:'Material für Müller bestellen'}}]});
-    await vi.advanceTimersByTimeAsync(2499);
+    await vi.advanceTimersByTimeAsync(4999);
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await expect(promise).resolves.toEqual({text:'Material für Müller bestellen'});
+  });
+
+  it('übernimmt mehrere Sprachabschnitte nach automatischem Erkennungsende',async()=>{
+    const promise=listenOnce();
+    const recognition=FakeRecognition.instances[0];
+    recognition.onresult({results:[{0:{transcript:'Material für Müller'}}]});
+    recognition.onend();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(recognition.starts).toBe(2);
+    recognition.onresult({results:[{0:{transcript:'bis Freitag bestellen'}}]});
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(promise).resolves.toEqual({text:'Material für Müller bis Freitag bestellen'});
   });
 
   it('lässt sich über ein Signal sofort abbrechen',async()=>{

@@ -50,7 +50,7 @@ function App(){
   const hear=async(controller:AbortController)=>{
     setListening(true);
     setStatus('Ich höre zu … Sprich in Ruhe.');
-    try{return(await listenOnce({timeoutMs:30000,silenceMs:2500,signal:controller.signal})).text}
+    try{return(await listenOnce({timeoutMs:30000,silenceMs:5000,signal:controller.signal})).text}
     finally{if(activeInput.current===controller)setListening(false)}
   };
   const ask=async(text:string,controller:AbortController)=>{
@@ -161,7 +161,7 @@ function App(){
   const inputActive=listening||guide!=='idle';
   return <>
     <header className="app-header">
-      <div className="brand"><img src={import.meta.env.BASE_URL+'app-icon-192.png'} alt="Adler Neu"/><div><strong>Adler Neu</strong><span>Mobile App</span></div></div>
+      <div className="brand"><img src={import.meta.env.BASE_URL+'adler-logo.png'} alt="Adler Neu"/><div><strong>Adler Neu</strong><span>Mobile App</span></div></div>
       <Mic aria-hidden="true"/>
     </header>
     <main>
@@ -173,9 +173,9 @@ function App(){
       </section>
 
       <section className="actions">
-        <button onClick={guided} disabled={inputActive}><Mic/>Geführte Aufgabe</button>
         <button onClick={()=>quick('todo')} disabled={inputActive}><CheckSquare/>Schnelle Aufgabe</button>
         <button onClick={()=>quick('pinboard')} disabled={inputActive}><StickyNote/>Pinnwand-Notiz</button>
+        <button onClick={guided} disabled={inputActive}><Mic/>Geführte Aufgabe</button>
       </section>
 
       {draft&&<section className="card">

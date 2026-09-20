@@ -17,5 +17,6 @@ Nur lesend untersucht: `Stickadler/produktionsprogramm-v1`, Branch `main`, 20.09
 - Mobile speichert für Mitarbeiterzuweisungen die echte `assignedEmployeeId`.
 - „Für mich“ benötigt keine erfundene ID im Client: Eine leere Mitarbeiter-ID verwendet serverseitig den angemeldeten Benutzer.
 - Datum ohne Uhrzeit bleibt ein Datum; die frühere Annahme 17:00 wurde entfernt.
+- Die Test-PWA kann eine optionale Uhrzeit erfassen. Das bestehende Produktions-Backend benötigt vor der dauerhaften Speicherung noch ein separates Uhrzeitfeld; `dueDate` wird nicht zweckentfremdet.
 - Bilder werden erst nach dem erfolgreichen Anlegen des Todo-/Notiz-Datensatzes hochgeladen.
 - Die separate Test-PWA bleibt im Entwurfsmodus, bis Authentifizierung und CORS ausdrücklich zur Integration freigegeben wurden.

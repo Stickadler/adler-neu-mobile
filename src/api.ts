@@ -28,7 +28,7 @@ export const adlerApi={
   employees:async()=>{const result=await request<{config:{employees?:Employee[]}}>('/api/form-config');return result.config.employees||[]},
   createEntry:async(kind:EntryKind,data:EntryPayload)=>{
     if(kind==='todo'){
-      const result=await request<{card:{id:number}}>('/api/todos',{method:'POST',body:JSON.stringify({title:data.title,description:data.description||'',columnId:'open',dueDate:data.dueDate||'',assignedEmployeeId:data.assignedEmployeeId||''})});
+      const result=await request<{card:{id:number}}>('/api/todos',{method:'POST',body:JSON.stringify({title:data.title,description:data.description||'',columnId:'open',dueDate:data.dueDate||'',dueTime:data.dueTime||'',assignedEmployeeId:data.assignedEmployeeId||''})});
       return{id:result.card.id};
     }
     const result=await request<{note:{id:number}}>('/api/notes',{method:'POST',body:JSON.stringify({title:data.title,description:data.description||'',category:'Allgemein',data:{}})});

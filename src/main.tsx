@@ -207,8 +207,8 @@ function App(){
       <section className="actions">
         <button onClick={()=>quick('todo')} disabled={inputActive}><CheckSquare/>Schnelle Aufgabe</button>
         <button onClick={()=>quick('pinboard')} disabled={inputActive}><StickyNote/>Pinnwand-Notiz</button>
-        <button onClick={guided} disabled={inputActive}><Mic/>Geführte Aufgabe</button>
         <button onClick={()=>setStatus('Termin eintragen ist vorbereitet und wird mit dem Adler-Neu-Kalender verbunden.')} disabled={inputActive}><CalendarDays/>Termin eintragen</button>
+        <button className="guided-action" onClick={guided} disabled={inputActive}><Mic/>Geführte Aufgabe</button>
       </section>
 
       {draft&&<section className="card">

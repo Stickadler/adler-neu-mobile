@@ -37,6 +37,7 @@ main{max-width:760px;margin:auto;min-height:calc(100vh - 82px);padding:24px 20px
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
 .actions button,.photo,.choice button{border:1px solid var(--border);border-left:4px solid var(--primary);background:#fff;border-radius:8px;padding:17px 13px;display:flex;gap:9px;align-items:center;justify-content:center;color:#28323c;font-weight:700}
 .actions button:hover,.photo:hover,.choice button:hover{border-color:var(--primary);background:#fff5f4}
+.actions .guided-action{grid-column:1/-1;padding:10px 13px}
 .actions svg,.photo svg{color:var(--primary)}
 .card{text-align:left}
 .card-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
@@ -72,6 +73,7 @@ footer{text-align:center;color:#98a2b3;padding:28px}
   .actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
   .actions button{min-width:0;min-height:84px;padding:10px 4px;border-left-width:1px;flex-direction:column;gap:6px;font-size:11px;line-height:1.15;text-align:center}
   .actions button svg{width:22px;height:22px;flex:none}
+  .actions .guided-action{min-height:48px;padding:7px 10px;flex-direction:row;font-size:11px}
   .date-time{grid-template-columns:1fr 1fr;gap:8px}
   .card-title{align-items:flex-start;display:grid;grid-template-columns:1fr}
   .card-heading-actions{justify-content:flex-end}

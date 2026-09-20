@@ -21,12 +21,12 @@ describe('listenOnce',()=>{
   });
   afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals()});
 
-  it('wartet nach der letzten Sprache fünf Sekunden',async()=>{
+  it('wartet nach der letzten Sprache drei Sekunden',async()=>{
     let settled=false;
     const promise=listenOnce().then(result=>{settled=true;return result});
     const recognition=FakeRecognition.instances[0];
     recognition.onresult({results:[{0:{transcript:'Material für Müller bestellen'}}]});
-    await vi.advanceTimersByTimeAsync(4999);
+    await vi.advanceTimersByTimeAsync(2999);
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await expect(promise).resolves.toEqual({text:'Material für Müller bestellen'});
@@ -37,7 +37,7 @@ describe('listenOnce',()=>{
     const recognition=FakeRecognition.instances[0];
     const result={results:[{0:{transcript:'Rechnung prüfen'}}]};
     recognition.onresult(result);
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(2000);
     recognition.onresult(result);
     await vi.advanceTimersByTimeAsync(1000);
     await expect(promise).resolves.toEqual({text:'Rechnung prüfen'});
@@ -51,7 +51,7 @@ describe('listenOnce',()=>{
     await vi.advanceTimersByTimeAsync(200);
     expect(recognition.starts).toBe(2);
     recognition.onresult({results:[{0:{transcript:'bis Freitag bestellen'}}]});
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(3000);
     await expect(promise).resolves.toEqual({text:'Material für Müller bis Freitag bestellen'});
   });
 

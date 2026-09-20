@@ -1,14 +1,15 @@
 import React,{useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
-import{Mic,CheckSquare,StickyNote,Camera,UserRound,CalendarDays,Clock3,X,Volume2,VolumeX}from'lucide-react';
+import{Mic,CheckSquare,StickyNote,Camera,UserRound,CalendarDays,Clock3,X,Volume2,VolumeX,Save as SaveIcon}from'lucide-react';
 import'./styles.css';
 import{parseVoice}from'./voiceParser';
 import{listenOnce,speak,stopSpeaking}from'./speech';
 import{adlerApi}from'./api';
 import{resolveAssignee}from'./assigneeResolver';
+import{parseVoiceDecision}from'./voiceDecision';
 import type{VoiceDraft,EntryKind,Employee,EntryPayload}from'./types';
 
-type GuideStep='idle'|'title'|'descriptionChoice'|'description'|'dueChoice'|'due'|'dueTimeChoice'|'dueTime'|'assigneeChoice'|'assignee';
+type GuideStep='idle'|'title'|'descriptionChoice'|'description'|'dueChoice'|'due'|'dueTimeChoice'|'dueTime'|'assigneeChoice'|'assignee'|'confirm';
 
 function formatDate(value?:string){
   if(!value)return'';
@@ -52,7 +53,7 @@ function App(){
   const hear=async(controller:AbortController)=>{
     setListening(true);
     setStatus('Ich höre zu … Sprich in Ruhe.');
-    try{return(await listenOnce({timeoutMs:30000,silenceMs:5000,signal:controller.signal,onTranscript:text=>setStatus(`Erkannt: „${text}“ – ich warte 5 Sekunden.`)})).text}
+    try{return(await listenOnce({timeoutMs:30000,silenceMs:3000,signal:controller.signal,onTranscript:text=>setStatus(`Erkannt: „${text}“ – ich warte 3 Sekunden.`)})).text}
     finally{if(activeInput.current===controller)setListening(false)}
   };
   const ask=async(text:string,controller:AbortController)=>{
@@ -84,14 +85,46 @@ function App(){
     setSelectedEmployeeId('');
     setStatus('Eingabe verworfen.');
   };
+  async function save(entryDraft:VoiceDraft|null=draft,entryFiles:File[]=files,employeeId=selectedEmployeeId){
+    if(!entryDraft?.kind||!entryDraft.title)return;
+    setSaving(true);setStatus('Wird gespeichert …');
+    try{
+      const payload:EntryPayload={title:entryDraft.title,description:entryDraft.description||undefined,dueDate:entryDraft.dueDate,dueTime:entryDraft.dueTime,assignedEmployeeId:employeeId||undefined};
+      const entry=await adlerApi.createEntry(entryDraft.kind,payload);
+      for(const file of entryFiles)await adlerApi.uploadImage(entryDraft.kind,entry.id,file);
+      const message=entryDraft.kind==='todo'?'Aufgabe gespeichert.':'Pinnwand-Notiz gespeichert.';
+      setStatus(message);if(voicePromptsRef.current)void speak(message);setDraft(null);setFiles([]);setSelectedEmployeeId('');
+    }catch(error){setStatus(error instanceof Error?error.message:'Speichern fehlgeschlagen.')}
+    finally{setSaving(false)}
+  }
+  const saveManually=()=>{cancelInput();void save()};
+  const finishByVoice=async(command:string,entryDraft:VoiceDraft,controller:AbortController)=>{
+    const decision=parseVoiceDecision(command);
+    if(decision==='discard'){
+      setDraft(null);setFiles([]);setSelectedEmployeeId('');setStatus('Eingabe verworfen.');
+      if(voicePromptsRef.current)await speak('Eingabe verworfen.',controller.signal);
+      return
+    }
+    if(decision==='save'){
+      const resolution=resolveAssignee(entryDraft.assigneeName,employees);
+      await save(entryDraft,[],resolution.status==='matched'?resolution.employee!.id:'');
+      return
+    }
+    setStatus('Antwort nicht erkannt. Bitte oben Speichern oder Verwerfen wählen.');
+    if(voicePromptsRef.current)await speak('Antwort nicht erkannt. Bitte Speichern oder Verwerfen wählen.',controller.signal)
+  };
   const quick=async(forced?:EntryKind)=>{
     const controller=beginInput();
     try{
+      setFiles([]);setSelectedEmployeeId('');
       const parsed=parseVoice(await hear(controller));
       if(forced){parsed.kind=forced;parsed.needsDestinationChoice=false}
       setDraft(parsed);
+      if(parsed.needsDestinationChoice){setGuide('idle');setStatus('Notiz erkannt – Todo oder Pinnwand?');return}
+      setGuide('confirm');
+      const command=await ask('Eingabe erkannt. Soll ich sie speichern oder verwerfen?',controller);
+      await finishByVoice(command,parsed,controller);
       setGuide('idle');
-      setStatus(parsed.needsDestinationChoice?'Notiz erkannt – Todo oder Pinnwand?':'Eingabe erkannt. Bitte prüfen.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Spracheingabe fehlgeschlagen.');
@@ -141,9 +174,10 @@ function App(){
         next={...next,assigneeName:await ask('Welchem Mitarbeiter?',controller)};
         setDraft(next)
       }
+      setGuide('confirm');
+      const command=await ask('Die Aufgabe ist vollständig. Soll ich sie speichern oder verwerfen?',controller);
+      await finishByVoice(command,next,controller);
       setGuide('idle');
-      setStatus('Aufgabe vollständig. Bitte prüfen, optional Bilder hinzufügen und speichern.');
-      if(voicePromptsRef.current)void speak('Aufgabe vollständig. Bitte prüfen und speichern.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setGuide('idle');
@@ -155,18 +189,6 @@ function App(){
   };
 
   const choose=(kind:EntryKind)=>draft&&setDraft({...draft,kind,needsDestinationChoice:false});
-  const save=async()=>{
-    if(!draft?.kind||!draft.title)return;
-    setSaving(true);setStatus('Wird gespeichert …');
-    try{
-      const payload:EntryPayload={title:draft.title,description:draft.description||undefined,dueDate:draft.dueDate,dueTime:draft.dueTime,assignedEmployeeId:selectedEmployeeId||undefined};
-      const entry=await adlerApi.createEntry(draft.kind,payload);
-      for(const file of files)await adlerApi.uploadImage(draft.kind,entry.id,file);
-      const message=draft.kind==='todo'?'Aufgabe gespeichert.':'Pinnwand-Notiz gespeichert.';
-      setStatus(message);void speak(message);setDraft(null);setFiles([]);setSelectedEmployeeId('');
-    }catch(error){setStatus(error instanceof Error?error.message:'Speichern fehlgeschlagen.')}
-    finally{setSaving(false)}
-  };
 
   const inputActive=listening||guide!=='idle';
   return <>
@@ -189,7 +211,7 @@ function App(){
       </section>
 
       {draft&&<section className="card">
-        <div className="card-title"><h2>Eintrag prüfen</h2><button className="discard" onClick={discardDraft}><X size={17}/> Verwerfen</button></div>
+        <div className="card-title"><h2>Eintrag prüfen</h2><div className="card-heading-actions"><button className="top-save" disabled={saving||!draft.kind||!draft.title} onClick={saveManually}><SaveIcon size={17}/> Speichern</button><button className="discard" onClick={discardDraft}><X size={17}/> Verwerfen</button></div></div>
         {draft.needsDestinationChoice&&<div className="choice"><button onClick={()=>choose('todo')}>Todo</button><button onClick={()=>choose('pinboard')}>Pinnwand</button></div>}
         <label>Titel<input value={draft.title} onChange={event=>setDraft({...draft,title:event.target.value})}/></label>
         <label>Beschreibung<textarea value={draft.description||''} onChange={event=>setDraft({...draft,description:event.target.value})}/></label>
@@ -206,7 +228,7 @@ function App(){
         <button className="photo" onClick={()=>camera.current?.click()}><Camera/> Bilder hinzufügen {files.length>0?`(${files.length})`:''}</button>
         <input ref={camera} hidden type="file" accept="image/*" capture="environment" multiple onChange={event=>setFiles(Array.from(event.target.files||[]))}/>
         {files.length>0&&<div className="previews">{files.map((file,index)=><div key={file.name+index}>{file.name}<button onClick={()=>setFiles(files.filter((_,itemIndex)=>itemIndex!==index))}>×</button></div>)}</div>}
-        <button className="save" disabled={saving||!draft.kind||!draft.title} onClick={save}>{saving?'Speichert …':'Bestätigen & speichern'}</button>
+        <button className="save" disabled={saving||!draft.kind||!draft.title} onClick={saveManually}>{saving?'Speichert …':'Bestätigen & speichern'}</button>
       </section>}
       <footer>Adler Neu · Mobile</footer>
     </main>

@@ -33,7 +33,7 @@ main{max-width:760px;margin:auto;min-height:calc(100vh - 82px);padding:24px 20px
 .hero p{color:var(--muted);margin:0;min-height:22px}
 .active-dialog{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px}
 .badge{display:inline-block;padding:7px 11px;border-radius:999px;background:#fff1f0;color:#b9252c;font-size:12px;font-weight:700}
-.cancel-listening,.discard{border:1px solid var(--primary);background:#fff;color:#c72d28;border-radius:7px;padding:7px 11px;font-weight:700}
+.cancel-listening,.discard,.top-save{border:1px solid var(--primary);background:#fff;color:#c72d28;border-radius:7px;padding:7px 11px;font-weight:700}
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
 .actions button,.photo,.choice button{border:1px solid var(--border);border-left:4px solid var(--primary);background:#fff;border-radius:8px;padding:17px 13px;display:flex;gap:9px;align-items:center;justify-content:center;color:#28323c;font-weight:700}
 .actions button:hover,.photo:hover,.choice button:hover{border-color:var(--primary);background:#fff5f4}
@@ -41,7 +41,9 @@ main{max-width:760px;margin:auto;min-height:calc(100vh - 82px);padding:24px 20px
 .card{text-align:left}
 .card-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
 .card-title h2{font-size:20px;margin:0}
-.discard{display:flex;align-items:center;gap:5px}
+.card-heading-actions{display:flex;align-items:center;gap:7px}
+.discard,.top-save{display:flex;align-items:center;gap:5px}
+.top-save{background:var(--primary);color:#fff}
 .card label{display:grid;gap:7px;margin:14px 0;color:#4e5963;font-size:13px;font-weight:700}
 .card label span{display:flex;gap:7px;align-items:center}
 .card input,.card textarea,.card select{width:100%;padding:13px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#19212b}
@@ -71,5 +73,6 @@ footer{text-align:center;color:#98a2b3;padding:28px}
   .actions button{min-width:0;min-height:84px;padding:10px 4px;border-left-width:1px;flex-direction:column;gap:6px;font-size:11px;line-height:1.15;text-align:center}
   .actions button svg{width:22px;height:22px;flex:none}
   .date-time{grid-template-columns:1fr 1fr;gap:8px}
-  .card-title{align-items:flex-start}
+  .card-title{align-items:flex-start;display:grid;grid-template-columns:1fr}
+  .card-heading-actions{justify-content:flex-end}
 }

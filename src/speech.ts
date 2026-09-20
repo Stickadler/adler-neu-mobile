@@ -7,7 +7,7 @@ function abortError(){return new DOMException('Eingabe abgebrochen.','AbortError
 
 export function speechSupported(){return Boolean((window as any).SpeechRecognition||(window as any).webkitSpeechRecognition)}
 
-export function listenOnce({timeoutMs=30000,silenceMs=5000,signal,onTranscript}:ListenOptions={}):Promise<SpeechResult>{
+export function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTranscript}:ListenOptions={}):Promise<SpeechResult>{
   return new Promise((resolve,reject)=>{
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SR){reject(new Error('Spracherkennung wird von diesem Browser nicht unterstützt.'));return}

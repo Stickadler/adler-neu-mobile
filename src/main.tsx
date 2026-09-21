@@ -5,7 +5,7 @@ import'./styles.css';
 import{parseVoice}from'./voiceParser';
 import{listenOnce,speak,stopSpeaking}from'./speech';
 import{adlerApi}from'./api';
-import{resolveAssignee}from'./assigneeResolver';
+import{resolveAssignee,resolveAssigneeFromText}from'./assigneeResolver';
 import{parseVoiceDecision}from'./voiceDecision';
 import type{VoiceDraft,EntryKind,Employee,EntryPayload}from'./types';
 
@@ -143,7 +143,10 @@ function App(){
     const controller=beginInput();
     try{
       setFiles([]);setSelectedEmployeeId('');
-      const parsed=parseVoice(await hear(controller));
+      const spoken=await hear(controller);
+      const parsed=parseVoice(spoken);
+      const spokenAssignee=resolveAssigneeFromText(spoken,employees);
+      if(spokenAssignee.status==='matched')parsed.assigneeName=spokenAssignee.employee!.name;
       if(forced){parsed.kind=forced;parsed.needsDestinationChoice=false}
       setDraft(parsed);
       if(parsed.needsDestinationChoice){setGuide('idle');setStatus('Notiz erkannt – Todo oder Pinnwand?');return}
@@ -154,6 +157,33 @@ function App(){
     }catch(error){
       if(activeInput.current!==controller)return;
       setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Spracheingabe fehlgeschlagen.');
+    }finally{
+      if(activeInput.current===controller)activeInput.current=null;
+      setListening(false);
+    }
+  };
+  const extendDraft=async()=>{
+    if(!draft)return quick();
+    const controller=beginInput();
+    try{
+      const spoken=await hear(controller);
+      const addition=parseVoice(spoken);
+      const spokenAssignee=resolveAssigneeFromText(spoken,employees);
+      const next:VoiceDraft={
+        ...draft,
+        title:[draft.title,addition.title].filter(Boolean).join(' ').replace(/\s+/g,' ').trim(),
+        description:addition.description||draft.description,
+        dueDate:addition.dueDate||draft.dueDate,
+        dueTime:addition.dueTime||draft.dueTime,
+        assigneeName:spokenAssignee.status==='matched'?spokenAssignee.employee!.name:(addition.assigneeName||draft.assigneeName),
+        assignToSelf:addition.assignToSelf||draft.assignToSelf,
+      };
+      setDraft(next);
+      setGuide('idle');
+      setStatus('Aufgabe erweitert. Du kannst sie speichern oder erneut ergänzen.');
+    }catch(error){
+      if(activeInput.current!==controller)return;
+      setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Ergänzung fehlgeschlagen.');
     }finally{
       if(activeInput.current===controller)activeInput.current=null;
       setListening(false);
@@ -229,7 +259,7 @@ function App(){
     </header>
     <main>
       <section className="hero">
-        <button className={`mic${listening?' listening':''}`} onClick={()=>inputActive?cancelInput():quick()} aria-label={inputActive?'Spracheingabe abbrechen':'Spracheingabe starten'}>{inputActive?<X size={42}/>:<Mic size={42}/>}</button>
+        <button className={`mic${listening?' listening':''}`} onClick={()=>inputActive?cancelInput():draft?extendDraft():quick()} aria-label={inputActive?'Spracheingabe abbrechen':draft?'Aufgabe per Sprache erweitern':'Spracheingabe starten'}>{inputActive?<X size={42}/>:<Mic size={42}/>}</button>
         <h1>Spracheingabe</h1>
         <p aria-live="polite">{status}</p>
         {inputActive&&<div className="active-dialog"><span className="badge">{listening?'Ich höre zu':'Geführter Dialog aktiv'}</span><button className="cancel-listening" onClick={cancelInput}>Abbrechen</button></div>}

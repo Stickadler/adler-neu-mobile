@@ -24,39 +24,41 @@ function mergeSegments(segments:string[]){
   return words.join(' ').trim()
 }
 
-async function createVoiceGate(minVoiceLevel:number,signal?:AbortSignal){
-  if(minVoiceLevel<=0||!navigator.mediaDevices?.getUserMedia)return{isOpen:()=>true,close:()=>{}};
+async function createVoiceGate(minVoiceLevel:number,signal:AbortSignal|undefined,onOpen:()=>void){
+  if(minVoiceLevel<=0||!navigator.mediaDevices?.getUserMedia){onOpen();return()=>{}}
   const stream=await navigator.mediaDevices.getUserMedia({audio:true});
   const AudioCtx=(window.AudioContext||(window as any).webkitAudioContext);
-  if(!AudioCtx){stream.getTracks().forEach(track=>track.stop());return{isOpen:()=>true,close:()=>{}}}
+  if(!AudioCtx){stream.getTracks().forEach(track=>track.stop());onOpen();return()=>{}}
   const context=new AudioCtx();
   const analyser=context.createAnalyser();
   analyser.fftSize=1024;
   const source=context.createMediaStreamSource(stream);
   source.connect(analyser);
   const data=new Uint8Array(analyser.fftSize);
-  let open=false;
   let raf=0;
+  let opened=false;
   const tick=()=>{
     if(signal?.aborted)return;
     analyser.getByteTimeDomainData(data);
     let sum=0;
     for(const value of data){const normalized=(value-128)/128;sum+=normalized*normalized}
     const rms=Math.sqrt(sum/data.length);
-    if(rms>=minVoiceLevel){open=true;return}
+    if(rms>=minVoiceLevel){
+      opened=true;
+      onOpen();
+      return;
+    }
     raf=requestAnimationFrame(tick);
   };
   tick();
-  const close=()=>{
+  return()=>{
     cancelAnimationFrame(raf);
     stream.getTracks().forEach(track=>track.stop());
     void context.close().catch(()=>undefined);
   };
-  return{isOpen:()=>open,close};
 }
 
 export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTranscript,minVoiceLevel=0}:ListenOptions={}):Promise<SpeechResult>{
-  const gate=await createVoiceGate(minVoiceLevel,signal);
   return new Promise((resolve,reject)=>{
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SR){reject(new Error('Spracherkennung wird von diesem Browser nicht unterstützt.'));return}
@@ -67,41 +69,59 @@ export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTransc
     let resultSegments:string[]=[];
     let lastReportedTranscript='';
     let silenceTimer:number|undefined;
-    const clean=()=>{clearTimeout(overallTimer);clearTimeout(silenceTimer);signal?.removeEventListener('abort',onAbort);gate.close()};
-    const finish=(fn:()=>void)=>{if(settled)return;settled=true;clean();try{recognition.stop()}catch{}fn()};
-    const fullTranscript=()=>mergeSegments(resultSegments);
-    const complete=()=>finish(()=>{const text=fullTranscript();text?resolve({text}):reject(new Error('Keine Sprache erkannt. Bitte erneut versuchen.'))});
-    const start=()=>{if(settled||signal?.aborted)return;try{recognition.start()}catch{}};
-    const onAbort=()=>finish(()=>reject(abortError()));
-    const overallTimer=window.setTimeout(complete,timeoutMs);
+    let voiceOpen=minVoiceLevel<=0;
+    let closeGate=()=>{};
+    let recognitionStarted=false;
 
-    recognition.lang='de-DE';recognition.continuous=true;recognition.interimResults=true;recognition.maxAlternatives=1;
-    recognition.onresult=(event:any)=>{
-      resultSegments=Array.from(event.results||[]).map((result:any)=>String(result?.[0]?.transcript||''));
+    const fullTranscript=()=>mergeSegments(resultSegments);
+    const processHeard=()=>{
+      if(!voiceOpen||settled)return;
       const heard=fullTranscript();
-      if(!gate.isOpen()||!heard||heard===lastReportedTranscript)return;
+      if(!heard||heard===lastReportedTranscript)return;
       lastReportedTranscript=heard;
       onTranscript?.(heard);
       clearTimeout(silenceTimer);
       silenceTimer=window.setTimeout(complete,silenceMs);
     };
+    const clean=()=>{clearTimeout(overallTimer);clearTimeout(silenceTimer);signal?.removeEventListener('abort',onAbort);closeGate()};
+    const finish=(fn:()=>void)=>{if(settled)return;settled=true;clean();try{recognition.stop()}catch{}fn()};
+    const complete=()=>finish(()=>{const text=fullTranscript();text?resolve({text}):reject(new Error('Keine Sprache erkannt. Bitte erneut versuchen.'))});
+    const start=()=>{if(settled||signal?.aborted||recognitionStarted)return;try{recognition.start();recognitionStarted=true}catch{}};
+    const restart=()=>{recognitionStarted=false;window.setTimeout(start,50)};
+    const onAbort=()=>finish(()=>reject(abortError()));
+    const overallTimer=window.setTimeout(complete,timeoutMs);
+
+    recognition.lang='de-DE';recognition.continuous=true;recognition.interimResults=true;recognition.maxAlternatives=1;
+    recognition.onstart=()=>{recognitionStarted=true};
+    recognition.onresult=(event:any)=>{
+      resultSegments=Array.from(event.results||[]).map((result:any)=>String(result?.[0]?.transcript||''));
+      processHeard();
+    };
     recognition.onend=()=>{
       if(settled)return;
       const text=fullTranscript();
-      if(gate.isOpen()&&text)finish(()=>resolve({text}));
-      else window.setTimeout(start,80);
+      if(voiceOpen&&text)finish(()=>resolve({text}));
+      else restart();
     };
     recognition.onerror=(event:any)=>{
       if(settled)return;
-      if(event?.error==='no-speech'){
-        window.setTimeout(start,80);
-        return;
-      }
+      if(event?.error==='no-speech'){restart();return}
       if(event?.error==='aborted'&&signal?.aborted){onAbort();return}
       finish(()=>reject(new Error(event?.error==='not-allowed'?'Mikrofonzugriff wurde nicht erlaubt.':'Spracheingabe fehlgeschlagen.')));
     };
     signal?.addEventListener('abort',onAbort,{once:true});
+
+    // Start browser speech recognition immediately so the first words are buffered.
     start();
+
+    // Loudness gate runs in parallel and only decides when buffered speech is accepted.
+    void createVoiceGate(minVoiceLevel,signal,()=>{
+      voiceOpen=true;
+      processHeard();
+    }).then(close=>{closeGate=close}).catch(()=>{
+      voiceOpen=true;
+      processHeard();
+    });
   })
 }
 

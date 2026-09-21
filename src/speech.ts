@@ -1,5 +1,5 @@
 export type SpeechResult={text:string};
-export type ListenOptions={timeoutMs?:number;silenceMs?:number;signal?:AbortSignal;onTranscript?:(text:string)=>void};
+export type ListenOptions={timeoutMs?:number;silenceMs?:number;signal?:AbortSignal;onTranscript?:(text:string)=>void;minVoiceLevel?:number};
 
 let activeSpeechStop:(()=>void)|null=null;
 
@@ -24,7 +24,44 @@ function mergeSegments(segments:string[]){
   return words.join(' ').trim()
 }
 
-export function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTranscript}:ListenOptions={}):Promise<SpeechResult>{
+async function waitForVoiceLevel(minVoiceLevel:number,signal?:AbortSignal){
+  if(!navigator.mediaDevices?.getUserMedia)return;
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  const AudioCtx=(window.AudioContext||(window as any).webkitAudioContext);
+  if(!AudioCtx){stream.getTracks().forEach(track=>track.stop());return}
+  const context=new AudioCtx();
+  const analyser=context.createAnalyser();
+  analyser.fftSize=1024;
+  const source=context.createMediaStreamSource(stream);
+  source.connect(analyser);
+  const data=new Uint8Array(analyser.fftSize);
+  try{
+    await new Promise<void>((resolve,reject)=>{
+      let raf=0;
+      const started=performance.now();
+      const clean=()=>{cancelAnimationFrame(raf);signal?.removeEventListener('abort',onAbort)};
+      const onAbort=()=>{clean();reject(abortError())};
+      const tick=()=>{
+        if(signal?.aborted){onAbort();return}
+        analyser.getByteTimeDomainData(data);
+        let sum=0;
+        for(const value of data){const normalized=(value-128)/128;sum+=normalized*normalized}
+        const rms=Math.sqrt(sum/data.length);
+        if(rms>=minVoiceLevel){clean();resolve();return}
+        if(performance.now()-started>30000){clean();reject(new Error('Keine deutliche Sprache erkannt.'));return}
+        raf=requestAnimationFrame(tick);
+      };
+      signal?.addEventListener('abort',onAbort,{once:true});
+      tick();
+    });
+  }finally{
+    stream.getTracks().forEach(track=>track.stop());
+    await context.close().catch(()=>undefined);
+  }
+}
+
+export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTranscript,minVoiceLevel=0}:ListenOptions={}):Promise<SpeechResult>{
+  if(minVoiceLevel>0)await waitForVoiceLevel(minVoiceLevel,signal);
   return new Promise((resolve,reject)=>{
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SR){reject(new Error('Spracherkennung wird von diesem Browser nicht unterstützt.'));return}

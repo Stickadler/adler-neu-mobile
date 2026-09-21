@@ -67,7 +67,7 @@ function titleFromText(text:string){
   return stripDateTime(text)
     .replace(/^(schnelle\s+)?(aufgabe|todo|erinnerung|notiz|pinnwandnotiz)\s*:?\s*/i,'')
     .replace(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+soll\s+/i,'')
-    .replace(/,?\s*beschreibung\s+.*$/i,'')
+    .replace(/,?\s*beschreibung\s*(?::|-)?\s*.*$/i,'')
     .replace(/\b(?:für|an)\s+mich\b/gi,' ')
     .replace(/\b(?:mitarbeiter|kollege|kollegin)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?/gi,' ')
     .replace(/\b(?:an|für)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s*(?:zuweisen|geben)?(?=\s*(?:heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,:.;]))/gi,' ')
@@ -83,7 +83,7 @@ export function parseVoice(raw:string):VoiceDraft{
   if(/pinnwand|pinnwandnotiz|notiz für die pinnwand/.test(lower))kind='pinboard';
   else if(/\b(aufgabe|todo|erinnerung)\b/.test(lower)||/notiz als todo|todo-notiz/.test(lower))kind='todo';
   const plainNote=/^(schnelle\s+)?notiz\b/i.test(text)&&!kind;
-  const description=(text.match(/beschreibung\s+(.+?)(?=,?\s*(?:fällig|bis|für)\b|$)/i)||[])[1];
+  const description=(text.match(/\bbeschreibung\b\s*(?::|-)?\s*(.+?)(?=,?\s*(?:fällig|bis|mitarbeiter|kollege|kollegin)\b|$)/i)||[])[1]?.trim();
   const assignee=assigneeFromText(text);
   return{kind,title:titleFromText(text),description,dueDate:dueFromText(text),dueTime:timeFromText(text),assigneeName:assignee.name,assignToSelf:assignee.self,needsDestinationChoice:plainNote};
 }

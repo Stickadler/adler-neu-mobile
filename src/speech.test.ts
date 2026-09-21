@@ -43,6 +43,14 @@ describe('listenOnce',()=>{
     await expect(promise).resolves.toEqual({text:'Rechnung prüfen'});
   });
 
+  it('entfernt überlappende Wiederholungen aus Browser-Ergebnissen',async()=>{
+    const promise=listenOnce();
+    const recognition=FakeRecognition.instances[0];
+    recognition.onresult({results:[{0:{transcript:'Material bestellen'}},{0:{transcript:'Material bestellen für Daniel'}}]});
+    await vi.advanceTimersByTimeAsync(3000);
+    await expect(promise).resolves.toEqual({text:'Material bestellen für Daniel'});
+  });
+
   it('startet nach einem automatischen Erkennungsende nicht selbst neu',async()=>{
     const promise=listenOnce();
     const recognition=FakeRecognition.instances[0];

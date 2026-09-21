@@ -181,8 +181,9 @@ function App(){
       const additionalText=(parsed.description||parsed.title||spoken)
         .replace(/^(?:neuer\s+)?titel\s*[:\-]?\s*/i,'')
         .trim();
-      const appendDescription=!explicitTitle&&additionalText
-        ?[draft.description,additionalText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()
+      const descriptionAddition=parsed.description||(!explicitTitle?additionalText:'');
+      const appendDescription=descriptionAddition
+        ?[draft.description,descriptionAddition].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()
         :draft.description;
 
       const next:VoiceDraft={

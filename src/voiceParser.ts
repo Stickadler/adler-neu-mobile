@@ -39,26 +39,43 @@ function timeFromText(text:string){
 }
 
 function assigneeFromText(text:string){
-  if(/\bfür\s+mich\b/i.test(text))return{self:true};
-  const forName=text.match(/\bfür\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)(?=\s*[:,]|\s+(?:fällig|bis)\b)/);
-  if(forName)return{name:forName[1]};
+  if(/\b(?:für|an)\s+mich\b/i.test(text))return{self:true};
+  const labelled=text.match(/\b(?:mitarbeiter|kollege|kollegin)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)/i);
+  if(labelled)return{name:labelled[1]};
+  const assigned=text.match(/\b(?:an|für)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)(?=\s*(?:zuweisen|geben|$|[,.;]))/i);
+  if(assigned)return{name:assigned[1]};
   const prefix=text.match(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+soll\b/);
   if(prefix)return{name:prefix[1]};
-  const withPreposition=text.match(/\b(?:an|für)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+zuweisen\b/i);
-  if(withPreposition)return{name:withPreposition[1]};
-  const assigned=text.match(/\b([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)\s+zuweisen\b/);
-  return assigned?{name:assigned[1]}:{};
+  const suffix=text.match(/\b([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+zuweisen\b/i);
+  return suffix?{name:suffix[1]}:{};
 }
 
-function titleFromText(text:string){return text
-  .replace(/^(schnelle\s+)?(aufgabe|todo|erinnerung|notiz|pinnwandnotiz)\s*:?\s*/i,'')
-  .replace(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+soll\s+/i,'')
-  .replace(/^für\s+(?:mich|[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s*:\s*/i,'')
-  .replace(/,?\s*beschreibung\s+.*$/i,'').replace(/,?\s*(?:fällig|bis)\s+.*$/i,'')
-  .replace(/,?\s+für\s+mich\b/gi,'')
-  .replace(/,?\s+(?:(?:an|für)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s+zuweisen\b/g,'')
-  .trim();}
+function stripDateTime(text:string){
+  return text
+    .replace(/\b(?:fällig\s+)?(?:heute|morgen|übermorgen)\b/gi,' ')
+    .replace(/\b(?:fällig\s+)?(?:am\s+)?(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b/gi,' ')
+    .replace(/\b(?:fällig\s+)?(?:am\s+)?\d{1,2}\.\d{1,2}(?:\.\d{2,4})?\b/gi,' ')
+    .replace(/\bin\s+(?:\d+|ein(?:e[rm]?)?|eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\s+(?:tagen?|wochen?)\b/gi,' ')
+    .replace(/\b(?:um\s+)?(?:[01]?\d|2[0-3])(?::|\.)[0-5]\d\s*(?:uhr)?\b/gi,' ')
+    .replace(/\bum\s+(?:[01]?\d|2[0-3])\s*uhr\b/gi,' ')
+    .replace(/\bhalb\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\b/gi,' ')
+    .replace(/\b(?:um\s+)?(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\s*uhr\b/gi,' ');
+}
 
+function titleFromText(text:string){
+  return stripDateTime(text)
+    .replace(/^(schnelle\s+)?(aufgabe|todo|erinnerung|notiz|pinnwandnotiz)\s*:?\s*/i,'')
+    .replace(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+soll\s+/i,'')
+    .replace(/,?\s*beschreibung\s+.*$/i,'')
+    .replace(/\b(?:für|an)\s+mich\b/gi,' ')
+    .replace(/\b(?:mitarbeiter|kollege|kollegin)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?/gi,' ')
+    .replace(/\b(?:an|für)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s*(?:zuweisen|geben)?(?=\s*$|\s*[,.;])/gi,' ')
+    .replace(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s+zuweisen\b/gi,' ')
+    .replace(/\b(?:fällig|bis)\b/gi,' ')
+    .replace(/[,:;]+\s*$/g,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
 export function parseVoice(raw:string):VoiceDraft{
   const text=raw.trim(),lower=text.toLowerCase();let kind:VoiceDraft['kind']=null;
   if(/pinnwand|pinnwandnotiz|notiz für die pinnwand/.test(lower))kind='pinboard';

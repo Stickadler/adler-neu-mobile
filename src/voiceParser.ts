@@ -20,7 +20,23 @@ function dueFromText(text:string){
   return undefined;
 }
 
-function timeFromText(text:string){const match=text.match(/\b(?:um\s+)?([01]?\d|2[0-3])(?::|\.)([0-5]\d)\s*(?:uhr)?\b/i)||text.match(/\bum\s+([01]?\d|2[0-3])\s*uhr\b/i);if(!match)return undefined;return `${String(Number(match[1])).padStart(2,'0')}:${match[2]||'00'}`;}
+function timeFromText(text:string){
+  const normalized=text.toLowerCase().replace(/\s+/g,' ').trim();
+  const numeric=normalized.match(/\b(?:um\s+)?([01]?\d|2[0-3])(?::|\.)([0-5]\d)\s*(?:uhr)?\b/i)||normalized.match(/\bum\s+([01]?\d|2[0-3])\s*uhr\b/i);
+  if(numeric)return `${String(Number(numeric[1])).padStart(2,'0')}:${numeric[2]||'00'}`;
+  const half=normalized.match(/\bhalb\s+(eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\b/i);
+  if(half){
+    const next=numberWords[half[1]];
+    const hour=(next===1?12:next-1);
+    return `${String(hour).padStart(2,'0')}:30`;
+  }
+  const word=normalized.match(/\b(?:um\s+)?(eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\s*uhr\b/i);
+  if(word){
+    const hour=numberWords[word[1]];
+    return `${String(hour).padStart(2,'0')}:00`;
+  }
+  return undefined;
+}
 
 function assigneeFromText(text:string){
   if(/\bfür\s+mich\b/i.test(text))return{self:true};

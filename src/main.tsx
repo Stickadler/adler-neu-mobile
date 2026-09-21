@@ -71,12 +71,13 @@ function App(){
   };
   const hear=async(controller:AbortController,stopPromptOnSpeech=false)=>{
     setListening(true);
-    setStatus('Ich höre zu … Sprich in Ruhe.');
+    setStatus(handsFree?'Bereit – bitte laut und deutlich sprechen.':'Ich höre zu … Sprich in Ruhe.');
     try{
       return(await listenOnce({
         timeoutMs:30000,
         silenceMs:3000,
         signal:controller.signal,
+        minVoiceLevel:handsFree?0.055:0,
         onTranscript:text=>{
           if(stopPromptOnSpeech)stopSpeaking();
           setStatus(`Erkannt: „${text}“ – ich warte 3 Sekunden.`);
@@ -181,6 +182,20 @@ function App(){
       }
 
       const descriptionExtension=spoken.match(/^\s*(?:die\s+)?beschreibung\s+(?:ergänzen|hinzufügen|erweitern)\s*(?::|-)?\s*(.+)\s*$/i)?.[1]?.trim();
+
+      const employeeCommand=/^\s*(?:mitarbeiter|kollege|kollegin)\s+.+/i.test(spoken);
+      if(employeeCommand){
+        const employeeResolution=resolveAssigneeFromText(spoken,employees);
+        if(employeeResolution.status==='matched'){
+          setDraft({...draft,assigneeName:employeeResolution.employee!.name});
+          setSelectedEmployeeId(employeeResolution.employee!.id);
+          setGuide('idle');
+          setStatus(`Mitarbeiter ${employeeResolution.employee!.name} wurde zugeordnet.`);
+        }else{
+          setStatus(employeeResolution.status==='ambiguous'?'Mitarbeiter ist mehrdeutig – bitte auswählen.':'Mitarbeiter wurde nicht gefunden – bitte auswählen.');
+        }
+        return
+      }
 
       const decision=parseVoiceDecision(spoken);
       if(decision==='discard'){discardDraft();return}

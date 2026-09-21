@@ -24,44 +24,39 @@ function mergeSegments(segments:string[]){
   return words.join(' ').trim()
 }
 
-async function waitForVoiceLevel(minVoiceLevel:number,signal?:AbortSignal){
-  if(!navigator.mediaDevices?.getUserMedia)return;
+async function createVoiceGate(minVoiceLevel:number,signal?:AbortSignal){
+  if(minVoiceLevel<=0||!navigator.mediaDevices?.getUserMedia)return{isOpen:()=>true,close:()=>{}};
   const stream=await navigator.mediaDevices.getUserMedia({audio:true});
   const AudioCtx=(window.AudioContext||(window as any).webkitAudioContext);
-  if(!AudioCtx){stream.getTracks().forEach(track=>track.stop());return}
+  if(!AudioCtx){stream.getTracks().forEach(track=>track.stop());return{isOpen:()=>true,close:()=>{}}}
   const context=new AudioCtx();
   const analyser=context.createAnalyser();
   analyser.fftSize=1024;
   const source=context.createMediaStreamSource(stream);
   source.connect(analyser);
   const data=new Uint8Array(analyser.fftSize);
-  try{
-    await new Promise<void>((resolve,reject)=>{
-      let raf=0;
-      const started=performance.now();
-      const clean=()=>{cancelAnimationFrame(raf);signal?.removeEventListener('abort',onAbort)};
-      const onAbort=()=>{clean();reject(abortError())};
-      const tick=()=>{
-        if(signal?.aborted){onAbort();return}
-        analyser.getByteTimeDomainData(data);
-        let sum=0;
-        for(const value of data){const normalized=(value-128)/128;sum+=normalized*normalized}
-        const rms=Math.sqrt(sum/data.length);
-        if(rms>=minVoiceLevel){clean();resolve();return}
-        if(performance.now()-started>30000){clean();reject(new Error('Keine deutliche Sprache erkannt.'));return}
-        raf=requestAnimationFrame(tick);
-      };
-      signal?.addEventListener('abort',onAbort,{once:true});
-      tick();
-    });
-  }finally{
+  let open=false;
+  let raf=0;
+  const tick=()=>{
+    if(signal?.aborted)return;
+    analyser.getByteTimeDomainData(data);
+    let sum=0;
+    for(const value of data){const normalized=(value-128)/128;sum+=normalized*normalized}
+    const rms=Math.sqrt(sum/data.length);
+    if(rms>=minVoiceLevel){open=true;return}
+    raf=requestAnimationFrame(tick);
+  };
+  tick();
+  const close=()=>{
+    cancelAnimationFrame(raf);
     stream.getTracks().forEach(track=>track.stop());
     void context.close().catch(()=>undefined);
-  }
+  };
+  return{isOpen:()=>open,close};
 }
 
 export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTranscript,minVoiceLevel=0}:ListenOptions={}):Promise<SpeechResult>{
-  if(minVoiceLevel>0)await waitForVoiceLevel(minVoiceLevel,signal);
+  const gate=await createVoiceGate(minVoiceLevel,signal);
   return new Promise((resolve,reject)=>{
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SR){reject(new Error('Spracherkennung wird von diesem Browser nicht unterstützt.'));return}
@@ -72,7 +67,7 @@ export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTransc
     let resultSegments:string[]=[];
     let lastReportedTranscript='';
     let silenceTimer:number|undefined;
-    const clean=()=>{clearTimeout(overallTimer);clearTimeout(silenceTimer);signal?.removeEventListener('abort',onAbort)};
+    const clean=()=>{clearTimeout(overallTimer);clearTimeout(silenceTimer);signal?.removeEventListener('abort',onAbort);gate.close()};
     const finish=(fn:()=>void)=>{if(settled)return;settled=true;clean();try{recognition.stop()}catch{}fn()};
     const fullTranscript=()=>mergeSegments(resultSegments);
     const complete=()=>finish(()=>{const text=fullTranscript();text?resolve({text}):reject(new Error('Keine Sprache erkannt. Bitte erneut versuchen.'))});
@@ -84,7 +79,7 @@ export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTransc
     recognition.onresult=(event:any)=>{
       resultSegments=Array.from(event.results||[]).map((result:any)=>String(result?.[0]?.transcript||''));
       const heard=fullTranscript();
-      if(!heard||heard===lastReportedTranscript)return;
+      if(!gate.isOpen()||!heard||heard===lastReportedTranscript)return;
       lastReportedTranscript=heard;
       onTranscript?.(heard);
       clearTimeout(silenceTimer);
@@ -93,13 +88,13 @@ export async function listenOnce({timeoutMs=30000,silenceMs=3000,signal,onTransc
     recognition.onend=()=>{
       if(settled)return;
       const text=fullTranscript();
-      if(text)finish(()=>resolve({text}));
-      else finish(()=>reject(new Error('Keine Sprache erkannt. Bitte erneut starten.')));
+      if(gate.isOpen()&&text)finish(()=>resolve({text}));
+      else window.setTimeout(start,80);
     };
     recognition.onerror=(event:any)=>{
       if(settled)return;
       if(event?.error==='no-speech'){
-        finish(()=>reject(new Error('Keine Sprache erkannt. Bitte erneut starten.')));
+        window.setTimeout(start,80);
         return;
       }
       if(event?.error==='aborted'&&signal?.aborted){onAbort();return}

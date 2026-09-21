@@ -67,17 +67,26 @@ function App(){
     activeInput.current=controller;
     return controller
   };
-  const hear=async(controller:AbortController)=>{
+  const hear=async(controller:AbortController,stopPromptOnSpeech=false)=>{
     setListening(true);
     setStatus('Ich höre zu … Sprich in Ruhe.');
-    try{return(await listenOnce({timeoutMs:30000,silenceMs:3000,signal:controller.signal,onTranscript:text=>setStatus(`Erkannt: „${text}“ – ich warte 3 Sekunden.`)})).text}
+    try{
+      return(await listenOnce({
+        timeoutMs:30000,
+        silenceMs:3000,
+        signal:controller.signal,
+        onTranscript:text=>{
+          if(stopPromptOnSpeech)stopSpeaking();
+          setStatus(`Erkannt: „${text}“ – ich warte 3 Sekunden.`);
+        },
+      })).text
+    }
     finally{if(activeInput.current===controller)setListening(false)}
   };
   const ask=async(text:string,controller:AbortController)=>{
     setStatus(text);
-    if(voicePromptsRef.current)await speak(text,controller.signal);
-    else await new Promise(resolve=>window.setTimeout(resolve,200));
-    return hear(controller)
+    if(voicePromptsRef.current)void speak(text,controller.signal).catch(()=>undefined);
+    return hear(controller,true)
   };
   const toggleVoicePrompts=()=>{
     const enabled=!voicePromptsRef.current;
@@ -151,6 +160,11 @@ function App(){
     }
   };
   const guided=async()=>{
+    if(!voicePromptsRef.current){
+      voicePromptsRef.current=true;
+      setVoicePrompts(true);
+      localStorage.setItem('adler-voice-prompts','on');
+    }
     const controller=beginInput();
     try{
       setFiles([]);setSelectedEmployeeId('');

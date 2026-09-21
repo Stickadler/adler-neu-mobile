@@ -207,7 +207,7 @@ function App(){
       const additionalText=(parsed.description||parsed.title||spoken)
         .replace(/^(?:neuer\s+)?titel\s*[:\-]?\s*/i,'')
         .trim();
-      const descriptionAddition=descriptionExtension||parsed.description||(!explicitTitle?additionalText:'');
+      const descriptionAddition=descriptionExtension||parsed.description||'';
       const appendDescription=descriptionAddition
         ?[draft.description,descriptionAddition].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()
         :draft.description;
@@ -226,7 +226,7 @@ function App(){
       setDraft(next);
       if(spokenAssignee.status==='matched')setSelectedEmployeeId(spokenAssignee.employee!.id);
       setGuide('idle');
-      setStatus(explicitTitle?'Titel ersetzt. Weitere Angaben der bestehenden Aufgabe wurden aktualisiert.':descriptionExtension?'Beschreibung wurde ergänzt.':'Neue Spracheingabe wurde zur bestehenden Aufgabe ergänzt.');
+      setStatus(explicitTitle?'Titel ersetzt. Weitere Angaben der bestehenden Aufgabe wurden aktualisiert.':descriptionAddition?'Beschreibung wurde ergänzt.':'Weitere Angaben der bestehenden Aufgabe wurden aktualisiert.');
     }catch(error){
       if(activeInput.current!==controller)return;
       if(isAbort(error))setStatus('Eingabe abgebrochen.');

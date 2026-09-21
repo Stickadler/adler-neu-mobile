@@ -49,9 +49,10 @@ function App(){
   const activeInput=useRef<AbortController|null>(null);
   const voicePromptsRef=useRef(voicePrompts);
 
-  useEffect(()=>{adlerApi.employees().then(setEmployees).catch(()=>setStatus('Entwurfsmodus – Adler API noch nicht erreichbar.'))},[]);
+  const loadEmployees=()=>adlerApi.employees().then(setEmployees).catch(()=>setStatus('Mitarbeiter konnten nicht geladen werden – Hauptprogramm-Verbindung prüfen.'));
+  useEffect(()=>{void loadEmployees()},[]);
   useEffect(()=>{
-    if(!draft?.assigneeName||!employees.length){setSelectedEmployeeId('');return}
+    if(!draft?.assigneeName||!employees.length)return
     const resolution=resolveAssignee(draft.assigneeName,employees);
     if(resolution.status==='matched')setSelectedEmployeeId(resolution.employee!.id);
     else{
@@ -112,13 +113,14 @@ function App(){
     setStatus('Eingabe verworfen.');
   };
   async function save(entryDraft:VoiceDraft|null=draft,entryFiles:File[]=files,employeeId=selectedEmployeeId){
-    if(!entryDraft?.kind||!entryDraft.title)return;
+    if(!entryDraft?.title)return;
+    const kind:EntryKind=entryDraft.kind||'todo';
     setSaving(true);setStatus('Wird gespeichert …');
     try{
       const payload:EntryPayload={title:entryDraft.title,description:entryDraft.description||undefined,dueDate:entryDraft.dueDate,dueTime:entryDraft.dueTime,assignedEmployeeId:employeeId||undefined};
-      const entry=await adlerApi.createEntry(entryDraft.kind,payload);
-      for(const file of entryFiles)await adlerApi.uploadImage(entryDraft.kind,entry.id,file);
-      const message=entryDraft.kind==='todo'?'Aufgabe gespeichert.':'Pinnwand-Notiz gespeichert.';
+      const entry=await adlerApi.createEntry(kind,payload);
+      for(const file of entryFiles)await adlerApi.uploadImage(kind,entry.id,file);
+      const message=kind==='todo'?'Aufgabe gespeichert.':'Pinnwand-Notiz gespeichert.';
       setStatus(message);if(voicePromptsRef.current)void speak(message);setDraft(null);setFiles([]);setSelectedEmployeeId('');
     }catch(error){setStatus(error instanceof Error?error.message:'Speichern fehlgeschlagen.')}
     finally{setSaving(false)}
@@ -148,6 +150,7 @@ function App(){
       const spokenAssignee=resolveAssigneeFromText(spoken,employees);
       if(spokenAssignee.status==='matched')parsed.assigneeName=spokenAssignee.employee!.name;
       if(forced){parsed.kind=forced;parsed.needsDestinationChoice=false}
+      else if(!parsed.kind&&!parsed.needsDestinationChoice)parsed.kind='todo';
       setDraft(parsed);
       setGuide('idle');
       if(parsed.needsDestinationChoice){setStatus('Notiz erkannt – Todo oder Pinnwand?');return}
@@ -161,29 +164,39 @@ function App(){
     }
   };
   const extendDraft=async()=>{
-    if(!draft)return quick();
+    if(!draft)return quick('todo');
     const controller=beginInput();
     try{
       const spoken=await hear(controller);
       const decision=parseVoiceDecision(spoken);
       if(decision==='discard'){discardDraft();return}
       if(decision==='save'){cancelInput();void save();return}
-      const replacement=parseVoice(spoken);
+
+      const parsed=parseVoice(spoken);
       const spokenAssignee=resolveAssigneeFromText(spoken,employees);
+      const explicitTitle=spoken.match(/(?:^|\b)(?:neuer\s+)?titel\s*[:\-]?\s*(.+?)(?=\s+(?:beschreibung|fällig|am|um|mitarbeiter|für)\b|$)/i)?.[1]?.trim();
+      const additionalText=(parsed.description||parsed.title||spoken)
+        .replace(/^(?:neuer\s+)?titel\s*[:\-]?\s*/i,'')
+        .trim();
+      const appendDescription=!explicitTitle&&additionalText
+        ?[draft.description,additionalText].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()
+        :draft.description;
+
       const next:VoiceDraft={
-        kind:replacement.kind||draft.kind,
-        title:replacement.title,
-        description:replacement.description,
-        dueDate:replacement.dueDate,
-        dueTime:replacement.dueTime,
-        assigneeName:spokenAssignee.status==='matched'?spokenAssignee.employee!.name:replacement.assigneeName,
-        assignToSelf:replacement.assignToSelf,
-        needsDestinationChoice:replacement.needsDestinationChoice,
+        ...draft,
+        kind:draft.kind||'todo',
+        title:explicitTitle||draft.title,
+        description:appendDescription,
+        dueDate:parsed.dueDate||draft.dueDate,
+        dueTime:parsed.dueTime||draft.dueTime,
+        assigneeName:spokenAssignee.status==='matched'?spokenAssignee.employee!.name:(parsed.assigneeName||draft.assigneeName),
+        assignToSelf:parsed.assignToSelf||draft.assignToSelf,
+        needsDestinationChoice:false,
       };
       setDraft(next);
-      setSelectedEmployeeId('');
+      if(spokenAssignee.status==='matched')setSelectedEmployeeId(spokenAssignee.employee!.id);
       setGuide('idle');
-      setStatus('Vorherige Eingabe wurde ersetzt. Du kannst jetzt prüfen, ändern oder speichern.');
+      setStatus(explicitTitle?'Titel ersetzt. Weitere Angaben der bestehenden Aufgabe wurden aktualisiert.':'Neue Spracheingabe wurde zur bestehenden Aufgabe ergänzt.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Ergänzung fehlgeschlagen.');
@@ -274,24 +287,24 @@ function App(){
       </section>
 
       {draft&&<section className="card">
-        <div className="card-title"><h2>Eintrag prüfen</h2><div className="card-heading-actions"><button className="top-save" disabled={saving||!draft.kind||!draft.title} onClick={saveManually}><SaveIcon size={17}/> Speichern</button><button className="discard" onClick={discardDraft}><X size={17}/> Verwerfen</button></div></div>
+        <div className="card-title"><h2>Eintrag prüfen</h2><div className="card-heading-actions"><button className="top-save" disabled={saving||!draft.title} onClick={saveManually}><SaveIcon size={17}/> Speichern</button><button className="discard" onClick={discardDraft}><X size={17}/> Verwerfen</button></div></div>
         {draft.needsDestinationChoice&&<div className="choice"><button onClick={()=>choose('todo')}>Todo</button><button onClick={()=>choose('pinboard')}>Pinnwand</button></div>}
         <label>Titel<input value={draft.title} onChange={event=>setDraft({...draft,title:event.target.value})}/></label>
         <label>Beschreibung<textarea value={draft.description||''} onChange={event=>setDraft({...draft,description:event.target.value})}/></label>
         {draft.kind==='todo'&&<>
           <div className="date-time">
             <label><span><CalendarDays size={17}/> Fällig am</span><input type="date" value={draft.dueDate||''} onChange={event=>setDraft({...draft,dueDate:event.target.value||undefined,dueTime:event.target.value?draft.dueTime:undefined})}/></label>
-            <label><span><Clock3 size={17}/> Uhrzeit</span><input type="time" value={draft.dueTime||''} disabled={!draft.dueDate} onChange={event=>setDraft({...draft,dueTime:event.target.value||undefined})}/></label>
+            <label><span><Clock3 size={17}/> Uhrzeit</span><input type="time" value={draft.dueTime||''} onChange={event=>setDraft({...draft,dueTime:event.target.value||undefined})}/></label>
           </div>
           {draft.dueDate&&<p className="due-summary"><CalendarDays/> Fällig: {formatDate(draft.dueDate)}{draft.dueTime&&` um ${draft.dueTime} Uhr`}</p>}
         </>}
-        <label><span><UserRound size={17}/> Mitarbeiter</span><select value={selectedEmployeeId} onChange={event=>setSelectedEmployeeId(event.target.value)}><option value="">Nicht zugewiesen</option>{employees.filter(employee=>employee.active).map(employee=><option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
+        <label><span><UserRound size={17}/> Mitarbeiter</span><div className="employee-row"><select value={selectedEmployeeId} onFocus={()=>{if(!employees.length)void loadEmployees()}} onChange={event=>setSelectedEmployeeId(event.target.value)}><option value="">Nicht zugewiesen</option>{employees.filter(employee=>employee.active).map(employee=><option key={employee.id} value={employee.id}>{employee.name}</option>)}</select>{!employees.length&&<button type="button" className="reload-employees" onClick={()=>void loadEmployees()}>Neu laden</button>}</div></label>
         {draft.assignToSelf&&<p>Zuordnung: angemeldeter Benutzer</p>}
         {draft.assigneeName&&!selectedEmployeeId&&employees.length>0&&<p className="warning">Gesprochen: {draft.assigneeName} – bitte Mitarbeiter bestätigen.</p>}
         <button className="photo" onClick={()=>camera.current?.click()}><Camera/> Bilder hinzufügen {files.length>0?`(${files.length})`:''}</button>
         <input ref={camera} hidden type="file" accept="image/*" capture="environment" multiple onChange={event=>setFiles(Array.from(event.target.files||[]))}/>
         {files.length>0&&<div className="previews">{files.map((file,index)=><div key={file.name+index}>{file.name}<button onClick={()=>setFiles(files.filter((_,itemIndex)=>itemIndex!==index))}>×</button></div>)}</div>}
-        <button className="save" disabled={saving||!draft.kind||!draft.title} onClick={saveManually}>{saving?'Speichert …':'Bestätigen & speichern'}</button>
+        <button className="save" disabled={saving||!draft.title} onClick={saveManually}>{saving?'Speichert …':'Bestätigen & speichern'}</button>
       </section>}
       <footer>Adler Neu · Mobile</footer>
     </main>

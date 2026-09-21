@@ -75,12 +75,12 @@ function App(){
     try{
       return(await listenOnce({
         timeoutMs:30000,
-        silenceMs:3000,
+        silenceMs:handsFree?1200:1800,
         signal:controller.signal,
         minVoiceLevel:handsFree?0.055:0,
         onTranscript:text=>{
           if(stopPromptOnSpeech)stopSpeaking();
-          setStatus(`Erkannt: „${text}“ – ich warte 3 Sekunden.`);
+          setStatus(`Erkannt: „${text}“ – kurze Pause zum Abschließen.`);
         },
       })).text
     }
@@ -323,10 +323,10 @@ function App(){
     </header>
     <main>
       <section className="hero">
-        <button className={`mic${listening?' listening':''}`} onClick={()=>inputActive?cancelInput():draft?extendDraft():quick()} aria-label={inputActive?'Spracheingabe abbrechen':draft?'Aufgabe per Sprache erweitern':'Spracheingabe starten'}>{inputActive?<X size={42}/>:<Mic size={42}/>}</button>
+        <button className={`mic${listening?' listening':''}`} onClick={()=>inputActive?cancelInput():draft?extendDraft():quick()} aria-label={inputActive?'Spracheingabe abbrechen':draft?'Aufgabe per Sprache erweitern':'Spracheingabe starten'}><Mic size={42}/></button>
         <h1>Spracheingabe</h1>
         <p aria-live="polite">{status}</p>
-        {inputActive&&<div className="active-dialog"><span className="badge">{listening?'Ich höre zu':'Geführter Dialog aktiv'}</span><button className="cancel-listening" onClick={cancelInput}>Abbrechen</button></div>}
+        {inputActive&&<div className="active-dialog"><span className="badge">{listening?'Mikrofon aktiv':'Geführter Dialog aktiv'}</span><button className="cancel-listening" onClick={cancelInput}>Abbrechen</button></div>}
       </section>
 
       <section className="actions">

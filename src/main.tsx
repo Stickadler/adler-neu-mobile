@@ -18,6 +18,23 @@ function formatDate(value?:string){
 const yes=(text:string)=>/^(ja|ja bitte|gerne|okay|ok)\b/i.test(text.trim());
 const isAbort=(error:unknown)=>error instanceof DOMException&&error.name==='AbortError';
 
+function applyBrandingFromQuery(){
+  const params=new URLSearchParams(window.location.search);
+  const map:Record<string,string>={
+    header:'--header',
+    bar:'--bar',
+    primary:'--primary',
+    border:'--border',
+    heading:'--heading',
+    divider:'--divider',
+  };
+  for(const [param,variable] of Object.entries(map)){
+    const value=params.get(param);
+    if(value&&/^#[0-9a-f]{6}$/i.test(value))document.documentElement.style.setProperty(variable,value);
+  }
+}
+applyBrandingFromQuery();
+
 function App(){
   const[status,setStatus]=useState('Bereit');
   const[draft,setDraft]=useState<VoiceDraft|null>(null);

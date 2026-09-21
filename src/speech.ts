@@ -56,7 +56,7 @@ async function waitForVoiceLevel(minVoiceLevel:number,signal?:AbortSignal){
     });
   }finally{
     stream.getTracks().forEach(track=>track.stop());
-    await context.close().catch(()=>undefined);
+    void context.close().catch(()=>undefined);
   }
 }
 

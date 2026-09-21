@@ -149,11 +149,9 @@ function App(){
       if(spokenAssignee.status==='matched')parsed.assigneeName=spokenAssignee.employee!.name;
       if(forced){parsed.kind=forced;parsed.needsDestinationChoice=false}
       setDraft(parsed);
-      if(parsed.needsDestinationChoice){setGuide('idle');setStatus('Notiz erkannt – Todo oder Pinnwand?');return}
-      setGuide('confirm');
-      const command=await ask('Eingabe erkannt. Soll ich sie speichern oder verwerfen?',controller);
-      await finishByVoice(command,parsed,controller);
       setGuide('idle');
+      if(parsed.needsDestinationChoice){setStatus('Notiz erkannt – Todo oder Pinnwand?');return}
+      setStatus('Eingabe erkannt. Du kannst Datum, Uhrzeit oder Mitarbeiter ändern und anschließend speichern. Für eine neue Spracheingabe Mikrofon erneut drücken.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Spracheingabe fehlgeschlagen.');
@@ -167,20 +165,25 @@ function App(){
     const controller=beginInput();
     try{
       const spoken=await hear(controller);
-      const addition=parseVoice(spoken);
+      const decision=parseVoiceDecision(spoken);
+      if(decision==='discard'){discardDraft();return}
+      if(decision==='save'){cancelInput();void save();return}
+      const replacement=parseVoice(spoken);
       const spokenAssignee=resolveAssigneeFromText(spoken,employees);
       const next:VoiceDraft={
-        ...draft,
-        title:[draft.title,addition.title].filter(Boolean).join(' ').replace(/\s+/g,' ').trim(),
-        description:addition.description||draft.description,
-        dueDate:addition.dueDate||draft.dueDate,
-        dueTime:addition.dueTime||draft.dueTime,
-        assigneeName:spokenAssignee.status==='matched'?spokenAssignee.employee!.name:(addition.assigneeName||draft.assigneeName),
-        assignToSelf:addition.assignToSelf||draft.assignToSelf,
+        kind:replacement.kind||draft.kind,
+        title:replacement.title,
+        description:replacement.description,
+        dueDate:replacement.dueDate,
+        dueTime:replacement.dueTime,
+        assigneeName:spokenAssignee.status==='matched'?spokenAssignee.employee!.name:replacement.assigneeName,
+        assignToSelf:replacement.assignToSelf,
+        needsDestinationChoice:replacement.needsDestinationChoice,
       };
       setDraft(next);
+      setSelectedEmployeeId('');
       setGuide('idle');
-      setStatus('Aufgabe erweitert. Du kannst sie speichern oder erneut ergänzen.');
+      setStatus('Vorherige Eingabe wurde ersetzt. Du kannst jetzt prüfen, ändern oder speichern.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Ergänzung fehlgeschlagen.');
@@ -235,10 +238,8 @@ function App(){
         next={...next,assigneeName:await ask('Welchem Mitarbeiter?',controller)};
         setDraft(next)
       }
-      setGuide('confirm');
-      const command=await ask('Die Aufgabe ist vollständig. Soll ich sie speichern oder verwerfen?',controller);
-      await finishByVoice(command,next,controller);
       setGuide('idle');
+      setStatus('Die Aufgabe ist vollständig. Du kannst sie jetzt prüfen, Datum/Uhrzeit ändern und speichern. Für Speichern oder Verwerfen per Sprache Mikrofon erneut drücken.');
     }catch(error){
       if(activeInput.current!==controller)return;
       setGuide('idle');

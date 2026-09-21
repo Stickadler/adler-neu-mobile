@@ -36,7 +36,7 @@ function applyBrandingFromQuery(){
 applyBrandingFromQuery();
 
 function App(){
-  const[status,setStatus]=useState('Bereit');
+  const[status,setStatus]=useState('Bereit – einfach sprechen.');
   const[draft,setDraft]=useState<VoiceDraft|null>(null);
   const[files,setFiles]=useState<File[]>([]);
   const[employees,setEmployees]=useState<Employee[]>([]);
@@ -45,6 +45,7 @@ function App(){
   const[listening,setListening]=useState(false);
   const[voicePrompts,setVoicePrompts]=useState(()=>localStorage.getItem('adler-voice-prompts')!=='off');
   const[guide,setGuide]=useState<GuideStep>('idle');
+  const[handsFree,setHandsFree]=useState(()=>localStorage.getItem('adler-handsfree')!=='off');
   const camera=useRef<HTMLInputElement>(null);
   const activeInput=useRef<AbortController|null>(null);
   const voicePromptsRef=useRef(voicePrompts);
@@ -157,7 +158,9 @@ function App(){
       setStatus('Eingabe erkannt. Du kannst Datum, Uhrzeit oder Mitarbeiter ändern und anschließend speichern. Für eine neue Spracheingabe Mikrofon erneut drücken.');
     }catch(error){
       if(activeInput.current!==controller)return;
-      setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Spracheingabe fehlgeschlagen.');
+      if(isAbort(error))setStatus('Eingabe abgebrochen.');
+      else if(handsFree&&error instanceof Error&&/Keine Sprache erkannt/i.test(error.message))setStatus('Bereit – einfach sprechen.');
+      else setStatus(error instanceof Error?error.message:'Spracheingabe fehlgeschlagen.');
     }finally{
       if(activeInput.current===controller)activeInput.current=null;
       setListening(false);
@@ -199,7 +202,9 @@ function App(){
       setStatus(explicitTitle?'Titel ersetzt. Weitere Angaben der bestehenden Aufgabe wurden aktualisiert.':'Neue Spracheingabe wurde zur bestehenden Aufgabe ergänzt.');
     }catch(error){
       if(activeInput.current!==controller)return;
-      setStatus(isAbort(error)?'Eingabe abgebrochen.':error instanceof Error?error.message:'Ergänzung fehlgeschlagen.');
+      if(isAbort(error))setStatus('Eingabe abgebrochen.');
+      else if(handsFree&&error instanceof Error&&/Keine Sprache erkannt/i.test(error.message))setStatus('Bereit – einfach weiter sprechen.');
+      else setStatus(error instanceof Error?error.message:'Ergänzung fehlgeschlagen.');
     }finally{
       if(activeInput.current===controller)activeInput.current=null;
       setListening(false);
@@ -263,13 +268,31 @@ function App(){
     }
   };
 
+  useEffect(()=>{
+    if(!handsFree||saving||listening||guide!=='idle')return;
+    const timer=window.setTimeout(()=>{
+      if(activeInput.current)return;
+      if(draft)void extendDraft();
+      else void quick('todo');
+    },500);
+    return()=>window.clearTimeout(timer);
+  },[handsFree,saving,listening,guide,draft]);
+
+  const toggleHandsFree=()=>{
+    const enabled=!handsFree;
+    setHandsFree(enabled);
+    localStorage.setItem('adler-handsfree',enabled?'on':'off');
+    if(!enabled)cancelInput();
+    else setStatus('Automatische Spracheingabe aktiv – einfach sprechen.');
+  };
+
   const choose=(kind:EntryKind)=>draft&&setDraft({...draft,kind,needsDestinationChoice:false});
 
   const inputActive=listening||guide!=='idle';
   return <>
     <header className="app-header">
       <div className="brand"><img src={import.meta.env.BASE_URL+'adler-logo.png'} alt="Adler Neu"/><div><strong>Adler Neu</strong><span>Mobile App</span></div></div>
-      <button className="voice-toggle" onClick={toggleVoicePrompts} aria-label={voicePrompts?'Sprachausgabe stummschalten':'Sprachausgabe einschalten'} title={voicePrompts?'Sprachausgabe an':'Sprachausgabe aus'}>{voicePrompts?<Volume2/>:<VolumeX/>}<span>{voicePrompts?'Ton an':'Stumm'}</span></button>
+      <div className="header-actions"><button className="voice-toggle" onClick={toggleHandsFree} aria-label={handsFree?'Automatische Spracheingabe ausschalten':'Automatische Spracheingabe einschalten'} title={handsFree?'Auto-Mikrofon an':'Auto-Mikrofon aus'}><Mic/><span>{handsFree?'Auto-Mikro an':'Auto-Mikro aus'}</span></button><button className="voice-toggle" onClick={toggleVoicePrompts} aria-label={voicePrompts?'Sprachausgabe stummschalten':'Sprachausgabe einschalten'} title={voicePrompts?'Sprachausgabe an':'Sprachausgabe aus'}>{voicePrompts?<Volume2/>:<VolumeX/>}<span>{voicePrompts?'Ton an':'Stumm'}</span></button></div>
     </header>
     <main>
       <section className="hero">

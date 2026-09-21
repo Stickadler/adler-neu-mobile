@@ -21,6 +21,7 @@ button:disabled{cursor:not-allowed;opacity:.48}
 .voice-toggle{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--heading);padding:8px 10px;font-weight:700}
 .voice-toggle svg{width:21px;height:21px}
 .voice-toggle span{font-size:12px}
+.header-actions{display:flex;align-items:center;gap:8px}
 .brand{display:flex;align-items:center;gap:13px}
 .brand img{width:50px;height:50px;border-radius:9px;background:#fff;object-fit:contain;padding:3px}
 .brand div{display:grid;gap:2px}

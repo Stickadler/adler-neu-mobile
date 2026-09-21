@@ -22,7 +22,7 @@ function dueFromText(text:string){
 
 function timeFromText(text:string){
   const normalized=text.toLowerCase().replace(/\s+/g,' ').trim();
-  const numeric=normalized.match(/\b(?:um\s+)?([01]?\d|2[0-3])(?::|\.)([0-5]\d)\s*(?:uhr)?\b/i)||normalized.match(/\bum\s+([01]?\d|2[0-3])(?:\s*uhr)?\b/i);
+  const numeric=normalized.match(/\b(?:um\s+)?([01]?\d|2[0-3])(?::|\.)([0-5]\d)\s*(?:uhr)?\b/i)||normalized.match(/\b(?:um\s+)?([01]?\d|2[0-3])\s+uhr\b/i)||normalized.match(/\bum\s+([01]?\d|2[0-3])\b/i);
   if(numeric)return `${String(Number(numeric[1])).padStart(2,'0')}:${numeric[2]||'00'}`;
   const half=normalized.match(/\bhalb\s+(eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\b/i);
   if(half){
@@ -42,11 +42,11 @@ function assigneeFromText(text:string){
   if(/\b(?:für|an)\s+mich\b/i.test(text))return{self:true};
   const labelled=text.match(/\b(?:mitarbeiter|kollege|kollegin)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)/i);
   if(labelled)return{name:labelled[1]};
-  const assigned=text.match(/\b(?:an|für)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)(?=\s*(?:zuweisen|geben|heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,.;]))/i);
+  const assigned=text.match(/\b(?:an|für)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)(?=\s*(?:zuweisen|geben|heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,:.;]))/i);
   if(assigned)return{name:assigned[1]};
   const prefix=text.match(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+soll\b/);
   if(prefix)return{name:prefix[1]};
-  const suffix=text.match(/\b([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+zuweisen\b/i);
+  const suffix=text.match(/\b([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)\s+zuweisen\b/i);
   return suffix?{name:suffix[1]}:{};
 }
 
@@ -57,7 +57,8 @@ function stripDateTime(text:string){
     .replace(/\b(?:fällig\s+)?(?:am\s+)?\d{1,2}\.\d{1,2}(?:\.\d{2,4})?\b/gi,' ')
     .replace(/\bin\s+(?:\d+|ein(?:e[rm]?)?|eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\s+(?:tagen?|wochen?)\b/gi,' ')
     .replace(/\b(?:um\s+)?(?:[01]?\d|2[0-3])(?::|\.)[0-5]\d\s*(?:uhr)?\b/gi,' ')
-    .replace(/\bum\s+(?:[01]?\d|2[0-3])(?:\s*uhr)?\b/gi,' ')
+    .replace(/\b(?:um\s+)?(?:[01]?\d|2[0-3])\s+uhr\b/gi,' ')
+    .replace(/\bum\s+(?:[01]?\d|2[0-3])\b/gi,' ')
     .replace(/\bhalb\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\b/gi,' ')
     .replace(/\bum\s+(?:eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)(?:\s*uhr)?\b/gi,' ');
 }
@@ -69,9 +70,10 @@ function titleFromText(text:string){
     .replace(/,?\s*beschreibung\s+.*$/i,'')
     .replace(/\b(?:für|an)\s+mich\b/gi,' ')
     .replace(/\b(?:mitarbeiter|kollege|kollegin)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?/gi,' ')
-    .replace(/\b(?:an|für)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s*(?:zuweisen|geben)?(?=\s*(?:heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,.;]))/gi,' ')
-    .replace(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s+zuweisen\b/gi,' ')
+    .replace(/\b(?:an|für)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s*(?:zuweisen|geben)?(?=\s*(?:heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,:.;]))/gi,' ')
+    .replace(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+\s+zuweisen\b/gi,' ')
     .replace(/\b(?:fällig|bis)\b/gi,' ')
+    .replace(/^\s*[,:;]\s*/,'')
     .replace(/[,:;]+\s*$/g,'')
     .replace(/\s{2,}/g,' ')
     .trim();

@@ -43,16 +43,14 @@ describe('listenOnce',()=>{
     await expect(promise).resolves.toEqual({text:'Rechnung prüfen'});
   });
 
-  it('übernimmt mehrere Sprachabschnitte nach automatischem Erkennungsende',async()=>{
+  it('startet nach einem automatischen Erkennungsende nicht selbst neu',async()=>{
     const promise=listenOnce();
     const recognition=FakeRecognition.instances[0];
     recognition.onresult({results:[{0:{transcript:'Material für Müller'}}]});
     recognition.onend();
     await vi.advanceTimersByTimeAsync(200);
-    expect(recognition.starts).toBe(2);
-    recognition.onresult({results:[{0:{transcript:'bis Freitag bestellen'}}]});
-    await vi.advanceTimersByTimeAsync(3000);
-    await expect(promise).resolves.toEqual({text:'Material für Müller bis Freitag bestellen'});
+    expect(recognition.starts).toBe(1);
+    await expect(promise).resolves.toEqual({text:'Material für Müller'});
   });
 
   it('lässt sich über ein Signal sofort abbrechen',async()=>{

@@ -42,7 +42,7 @@ function assigneeFromText(text:string){
   if(/\b(?:für|an)\s+mich\b/i.test(text))return{self:true};
   const labelled=text.match(/\b(?:mitarbeiter|kollege|kollegin)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)/i);
   if(labelled)return{name:labelled[1]};
-  const assigned=text.match(/\b(?:an|für)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)(?=\s*(?:zuweisen|geben|$|[,.;]))/i);
+  const assigned=text.match(/\b(?:an|für)\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)(?=\s*(?:zuweisen|geben|heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,.;]))/i);
   if(assigned)return{name:assigned[1]};
   const prefix=text.match(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?)\s+soll\b/);
   if(prefix)return{name:prefix[1]};
@@ -69,7 +69,7 @@ function titleFromText(text:string){
     .replace(/,?\s*beschreibung\s+.*$/i,'')
     .replace(/\b(?:für|an)\s+mich\b/gi,' ')
     .replace(/\b(?:mitarbeiter|kollege|kollegin)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?/gi,' ')
-    .replace(/\b(?:an|für)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s*(?:zuweisen|geben)?(?=\s*$|\s*[,.;])/gi,' ')
+    .replace(/\b(?:an|für)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s*(?:zuweisen|geben)?(?=\s*(?:heute|morgen|übermorgen|am\b|um\b|fällig\b|bis\b|$|[,.;]))/gi,' ')
     .replace(/\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)?\s+zuweisen\b/gi,' ')
     .replace(/\b(?:fällig|bis)\b/gi,' ')
     .replace(/[,:;]+\s*$/g,'')
